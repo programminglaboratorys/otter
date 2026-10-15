@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "cases.hpp"
+#include "cases_probe.hpp"
 #include "win_backend.hpp"
 
 int main(int argc, char** argv) {
@@ -23,8 +24,11 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    auto list = cases::all();                 // hand-written cases
+    auto probed = cases::probe();
+    list.insert(list.end(), std::make_move_iterator(probed.begin()), std::make_move_iterator(probed.end()));
+
     int pass = 0, fail = 0, skip = 0;
-    const auto list = cases::all();
 
     for (auto& b : backends) {
         for (const auto& c : list) {

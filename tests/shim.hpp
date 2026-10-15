@@ -27,7 +27,8 @@ public:
     // ---- the primitives a backend overrides --------------------------------
     virtual void setString(const std::string&, const std::string&, const std::string&) { no("setString"); }
     virtual void setValue(const std::string&, const std::string&, int)                 { no("setValue"); }
-    virtual std::string getString(const std::string&, const std::string&)              { no("getString"); }
+    // 3rd argument: the default returned when the key is missing.
+    virtual std::string getString(const std::string&, const std::string&, const std::string&) { no("getString"); }
     virtual int getValue(const std::string&, const std::string&)                       { no("getValue"); }
     virtual void deleteItem(const std::string&, const std::string&)                    { no("deleteItem"); }
     virtual void deleteGroup(const std::string&)                                       { no("deleteGroup"); }
@@ -44,9 +45,9 @@ public:
     void SetValue(const std::string& i, int v)                           { setValue(group_, i, v); }
     void SetValue(const std::string& g, const std::string& i, int v)     { setValue(g, i, v); }
 
-    std::string GetString()                                              { return getString(group_, item_); }
-    std::string GetString(const std::string& i)                          { return getString(group_, i); }
-    std::string GetString(const std::string& g, const std::string& i)    { return getString(g, i); }
+    std::string GetString()                                              { return getString(group_, item_, ""); }
+    std::string GetString(const std::string& i)                          { return getString(group_, i, ""); }
+    std::string GetString(const std::string& g, const std::string& i)    { return getString(g, i, ""); }
 
     int GetValue()                                                       { return getValue(group_, item_); }
     int GetValue(const std::string& i)                                   { return getValue(group_, i); }

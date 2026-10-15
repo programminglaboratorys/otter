@@ -33,10 +33,10 @@ public:
         setString(g, i, std::to_string(v));
     }
 
-    // Note: a missing key and an empty value both return "" here.
-    std::string getString(const std::string& g, const std::string& i) override {
+    std::string getString(const std::string& g, const std::string& i,
+                          const std::string& def) override {
         std::string buf(65536, '\0');
-        DWORD n = GetPrivateProfileStringA(g.c_str(), i.c_str(), "", buf.data(),
+        DWORD n = GetPrivateProfileStringA(g.c_str(), i.c_str(), def.c_str(), buf.data(),
                                            static_cast<DWORD>(buf.size()), path_.c_str());
         buf.resize(n);
         return buf;
