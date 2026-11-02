@@ -222,6 +222,7 @@ namespace otter {
             if (it == key_line_indices.end())
                 return ""; // TODO: return a default
             auto index = it->second;
+            // TODO: handle and check the kind to ensure its the exact key
             const auto& line = lines[index];
             std::string_view key_name = this->GetName(line);
             if (!Utils::InplaceLowercaseComparison(key_name, key)) {
