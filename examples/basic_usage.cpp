@@ -16,9 +16,10 @@ World = Amazingo
 volume = 80
 mute
 ;[
-[annoyingSection] ; bleh, this should get ignored
+[annoyingSection] bleh, this should get ignored
 
 )*";
+
 
 int main()
 {

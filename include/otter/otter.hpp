@@ -111,11 +111,11 @@ namespace otter {
 
         std::string content = "";
 
-        std::vector<Line> lines;
+        std::vector<Line> lines; // fast metadata data
 
         void parse_lines(const std::string& test_content) {
             const char* character = test_content.c_str();
-            content = test_content; // TODO: move to a constructor
+            content = test_content; // TODO: move to a constructor or some loader
             std::string_view current_section = "";
 
             while (*character != '\0') {
@@ -125,7 +125,7 @@ namespace otter {
                 }
 
                 Line line;
-                line.offset = character - test_content.c_str();
+                line.offset = character - content.c_str();
 
                 if (*character == '[') {
                     // TODO: trim section names
@@ -138,7 +138,7 @@ namespace otter {
                     if (*character == ']') {
                         character++; // skip ']'
                     }
-                    line.name_off = section_start - test_content.c_str();
+                    line.name_off = section_start - content.c_str();
                     line.name_len = section_end - section_start;
 
                     current_section = std::string_view(section_start, section_end - section_start);
@@ -156,7 +156,7 @@ namespace otter {
                     while (*character != '\n' && *character != '\r' && *character != '\0') {
                         character++;
                     }
-                    line.name_off = comment_start - test_content.c_str();
+                    line.name_off = comment_start - content.c_str();
                     line.name_len = character - comment_start;
                     lines.push_back(line);
                 }
@@ -174,7 +174,7 @@ namespace otter {
 
                     if (*character == '=') {
                         line.kind = LineKind::KeyValue;
-                        line.name_off = key_start - test_content.c_str();
+                        line.name_off = key_start - content.c_str();
                         line.name_len = key_end - key_start;
 
                         character++; // skip '='
@@ -215,7 +215,7 @@ namespace otter {
 
         std::string_view get(std::string_view section, std::string_view key) {
             // hash
-            // IF YOU ARE SEEING THIS, I AM WORKING ON IT, WAIT TILL THE NEXT UPDATE FOR THIS TO BE FINISHED
+            // TODO: finish it
             xhash_t hash = Hash::GetLowercase(section, key);
             auto it = key_line_indices.find(hash);
             if (it == key_line_indices.end())
@@ -225,6 +225,7 @@ namespace otter {
             std::string_view key_name = this->GetName(line);
             if (!Utils::InplaceLowercaseComparison(key_name, key)) {
                 // TODO: handle the slow path
+                // NOTE: first match wins
             }
 
             //size_t index;
