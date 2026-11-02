@@ -2,7 +2,7 @@
 
 Everything in this `/icons` directory (logos, icons and images) is **not** covered by the MIT License that applies to the source code of this repository.
 
-**All rights reserved.** Copyright (c) 2026 the author of this repository.
+**All rights reserved.** Copyright (c) 2026 iamme.
 
 You may view these files in this repository and in its README. Without the author's prior written permission, you may not:
 
