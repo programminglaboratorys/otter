@@ -207,6 +207,7 @@ namespace otter {
                             character++;
                         }
                         // hmm should i add it to the key line indices map?
+                        key_line_indices.try_emplace(Hash::GetLowercase(current_section, std::string_view(key_start, key_end - key_start)), lines.size());  // to ensure the first one wins
                         lines.push_back(line);
                     }
                 }
