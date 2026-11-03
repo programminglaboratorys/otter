@@ -5,7 +5,10 @@
 #include <string_view>
 #include <iomanip>
 
+#include <tuple>
 #include <cstdint>
+
+// TODO: empty value vs missing key
 
 namespace otter {
 
@@ -84,6 +87,29 @@ namespace otter {
                 hash *= 1099511628211ULL;
             }
             return hash;
+        }
+
+
+        [[nodiscard]] inline constexpr std::tuple<xhash_t, xhash_t> GetLowercaseEx(std::string_view string1, std::string_view string2) noexcept {
+            xhash_t hash1 = 14695981039346656037ULL;
+            xhash_t hash2 = 0;
+            // first string
+            for (char c : string1) {
+                hash1 ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
+                hash1 *= 1099511628211ULL;
+            }
+            hash2 = hash1; // for later use
+
+            // ensure a seperator because otherwise ("ab", "c") and ("a", "bc") will hash identically
+            hash1 ^= static_cast<xhash_t>(static_cast<unsigned char>('\0'));
+            hash1 *= 1099511628211ULL;
+
+            // second string
+            for (char c : string2) {
+                hash1 ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
+                hash1 *= 1099511628211ULL;
+            }
+            return {hash2, hash1};
         }
     }
 
@@ -214,26 +240,40 @@ namespace otter {
             }
         }
 
-        std::string_view get(std::string_view section, std::string_view key) {
+        std::string_view get(std::string_view section, std::string_view key, std::string_view default = "") {
             // hash
             // TODO: finish it
-            xhash_t hash = Hash::GetLowercase(section, key);
+            auto [section_hash, hash] = Hash::GetLowercaseEx(section, key);
             auto it = key_line_indices.find(hash);
             if (it == key_line_indices.end())
-                return ""; // TODO: return a default
+                return default;
             auto index = it->second;
             // TODO: handle and check the kind to ensure its the exact key
             const auto& line = lines[index];
             std::string_view key_name = this->GetName(line);
-            if (!Utils::InplaceLowercaseComparison(key_name, key)) {
-                // TODO: handle the slow path
-                // NOTE: first match wins
+
+            // huh, now that we do double hashing, i wonder the collision chance lowered to what, think about it, one hash is 0.048 possible collision, two, is it twice or how
+            // just realized that we would gotta compare the section as well- just to double check-
+            if (Utils::InplaceLowercaseComparison(key_name, key)) {
+                return this->GetValue(line);
             }
+            // TODO: handle the slow path
+            // NOTE: first match wins
+            // TODO: use the section hash to find the section in lines then start iterating from there
+            auto it = section_line_indices[section_hash];
+            // check the validdity, failure return
+            // get the index & the line
+            // get the section name, then compare the inputted section
+            // two paths
+            // if the compersion fails, iterate from the start of the file
+            // if the compersion sccesss, iterate from that section till the next section, if not found, then fail, return the default
 
             //size_t index;
 
-            return this->GetValue(line);
         }
+
+
+
 
     private:
         std::string_view inline GetName(const Line& line) {
