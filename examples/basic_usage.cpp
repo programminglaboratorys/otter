@@ -35,6 +35,8 @@ int main()
     std::cout << "--------------" << std::endl;
     std::cout << "ini.get(\"Audio\", \"volume\"): ";
     std::cout << ini.get("Audio", "volume") << std::endl;
+    std::cout << "ini.get(\"Hello\", \"World\"): ";
+    std::cout << ini.get("Hello", "World") << std::endl;
     std::cout << "--------------" << std::endl;
     // print the lines
     for (const auto& line : ini.lines) {
