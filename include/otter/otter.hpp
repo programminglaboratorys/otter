@@ -10,6 +10,7 @@
 
 #include "utils.hpp"
 #include "defines.hpp"
+#include "detail.hpp"
 
 // TODO: empty value vs missing key
 
@@ -24,9 +25,6 @@ namespace otter {
 
         Map<std::string, Map<std::string, std::string>> ini{}; // TODO: should we remove?
 
-        // line index lookups
-        Map<xhash_t, size_t> section_line_indices;
-        Map<xhash_t, size_t> key_line_indices;
 
         std::string content = "";
 
@@ -166,6 +164,11 @@ namespace otter {
         }
 
     private:
+        using Source = detail::Source;
+        using Query = detail::Query;
+        using Slot = detail::Slot;
+        using LineTable = detail::LineTable;
+
         std::string_view inline GetName(const Line& line) {
             const char* key_start = content.c_str() + line.name_off;
             return { key_start, line.name_len };

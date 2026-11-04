@@ -180,6 +180,35 @@ namespace otter {
             // Debug helper: is exactly this slot (hash + both indices) in the table?
             bool contains(const Slot& want) const { return set_.find(want) != set_.end(); }
 
+
+            // the single place that decides what goes in the table. needed by rebuild()
+            // and also used by the debug check to verify
+            void fill(Source& source, LineTable& t) const {
+                const std::vector<Line>& lines = *source.lines;
+                uint32_t section_line = kNone;
+                for (uint32_t i = 0; i < lines.size(); ++i) {
+                    const Line& ln = lines[i];
+                    if (ln.kind == LineKind::Section) {
+                        section_line = i;
+                        t.insert(make_query(source, LineKind::Section, source.name(ln), {}), i, i);
+                    }
+                    else if (ln.kind == LineKind::KeyValue && ln.name_len != 0) {
+                        const std::string_view section = section_line == kNone ? std::string_view{} : source.name(lines[section_line]);
+                        t.insert(make_query(source, LineKind::KeyValue, section, source.name(ln)), i, section_line);
+                    }
+                }
+            }
+
+            void rebuild(Source& source) {
+                const std::vector<Line>& lines = *source.lines;
+                lines.erase(std::remove_if(lines.begin(), lines.end(),
+                    [](const Line& l) { return l.kind == LineKind::Blank; }),
+                    lines.end());
+                set_.reset(lines.size());
+                fill();
+                //dirty_ = false;
+            }
+
         private:
             Set set_;
         };
