@@ -33,6 +33,9 @@ namespace otter {
     // SIMD is possible btw
 
     using xhash_t = uint64_t;
+
+    constexpr uint32_t kNone = 0xFFFFFFFFu;
+
     namespace Utils {
 
         [[nodiscard]] inline char LowercaseCharacter(char c) {
@@ -48,66 +51,81 @@ namespace otter {
 
             return true;
         }
+
+        [[nodiscard]] inline bool InplaceComparison(std::string_view x, std::string_view y) {
+            size_t len = x.length();
+            if (len != y.length()) return false;
+
+            for (size_t pointer = 0; pointer < len; pointer++) {
+                if (x[pointer] != y[pointer]) return false;
+            }
+
+            return true;
+        }
+
     } // namespace Utils
 
     namespace Hash {
+        constexpr xhash_t kOffset = 14695981039346656037ULL;
+        constexpr xhash_t kPrime = 1099511628211ULL;
+
         [[nodiscard]] inline constexpr xhash_t Get(std::string_view string) noexcept {
-            xhash_t hash = 14695981039346656037ULL;
+            xhash_t hash = kOffset;
             for (char c : string) {
                 hash ^= static_cast<xhash_t>(static_cast<unsigned char>(c));
-                hash *= 1099511628211ULL;
+                hash *= kPrime;
             }
             return hash;
         }
 
         [[nodiscard]] inline constexpr xhash_t GetLowercase(std::string_view string) noexcept {
-            xhash_t hash = 14695981039346656037ULL;
+            xhash_t hash = kOffset;
             for (char c : string) {
                 hash ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
-                hash *= 1099511628211ULL;
+                hash *= kPrime;
             }
             return hash;
         }
 
         [[nodiscard]] inline constexpr xhash_t GetLowercase(std::string_view string1, std::string_view string2) noexcept {
-            xhash_t hash = 14695981039346656037ULL;
+            xhash_t hash = kOffset;
             // first string
             for (char c : string1) {
                 hash ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
-                hash *= 1099511628211ULL;
+                hash *= kPrime;
             }
 
             // ensure a seperator because otherwise ("ab", "c") and ("a", "bc") will hash identically
             hash ^= static_cast<xhash_t>(static_cast<unsigned char>('\0'));
-            hash *= 1099511628211ULL;
+            hash *= kPrime;
 
             // second string
             for (char c : string2) {
                 hash ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
-                hash *= 1099511628211ULL;
+                hash *= kPrime;
             }
             return hash;
         }
 
 
         [[nodiscard]] inline constexpr std::tuple<xhash_t, xhash_t> GetLowercaseEx(std::string_view string1, std::string_view string2) noexcept {
-            xhash_t hash1 = 14695981039346656037ULL;
+            xhash_t hash1 = kOffset;
             xhash_t hash2 = 0;
             // first string
             for (char c : string1) {
                 hash1 ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
-                hash1 *= 1099511628211ULL;
+                hash1 *= kPrime;
             }
             hash2 = hash1; // for later use
 
             // ensure a seperator because otherwise ("ab", "c") and ("a", "bc") will hash identically
             hash1 ^= static_cast<xhash_t>(static_cast<unsigned char>('\0'));
-            hash1 *= 1099511628211ULL;
+            hash1 *= kPrime;
 
             // second string
             for (char c : string2) {
                 hash1 ^= static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)));
-                hash1 *= 1099511628211ULL;
+                hash1 *= kPrime;
             }
             return {hash2, hash1};
         }
@@ -260,7 +278,7 @@ namespace otter {
             // TODO: handle the slow path
             // NOTE: first match wins
             // TODO: use the section hash to find the section in lines then start iterating from there
-            auto it = section_line_indices[section_hash];
+            auto it2 = section_line_indices[section_hash];
             // check the validdity, failure return
             // get the index & the line
             // get the section name, then compare the inputted section
