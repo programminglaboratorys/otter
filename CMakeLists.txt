@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 project(otter VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -15,6 +15,16 @@ endif()
 
 option(OTTER_BUILD_TESTS    "Build otter tests"    ${OTTER_IS_TOP_LEVEL})
 option(OTTER_BUILD_EXAMPLES "Build otter examples" ${OTTER_IS_TOP_LEVEL})
+
+# --- Integrate Google Abseil ---
+include(FetchContent)
+FetchContent_Declare(
+    abseil-cpp
+    URL https://github.com/abseil/abseil-cpp/archive/refs/tags/20240116.2.tar.gz
+    DOWNLOAD_EXTRACT_TIMESTAMP NEW
+)
+set(ABSL_PROPAGATE_CXX_STANDARD ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(abseil-cpp)
 
 
 add_library(otter STATIC
@@ -37,8 +47,15 @@ if(MSVC)
 else()
     target_compile_options(otter PRIVATE -Wall -Wextra -pedantic)
     find_package(Threads REQUIRED)
-    target_link_libraries(otter PRIVATE Threads::Threads)
 endif()
+
+# pull Abseil's flat_hash_set (and Threads)
+target_link_libraries(otter
+    PUBLIC
+        absl::flat_hash_set
+    PRIVATE
+        $<$<NOT:$<BOOL:${MSVC}>>:Threads::Threads>
+)
 
 # tests / examples 
 if(OTTER_BUILD_TESTS)
