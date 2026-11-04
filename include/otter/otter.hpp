@@ -48,7 +48,7 @@ namespace otter {
 
             return true;
         }
-    }
+    } // namespace Utils
 
     namespace Hash {
         [[nodiscard]] inline constexpr xhash_t Get(std::string_view string) noexcept {
@@ -111,7 +111,7 @@ namespace otter {
             }
             return {hash2, hash1};
         }
-    }
+    } // namespace Hash
 
 
     struct Line {
@@ -119,8 +119,8 @@ namespace otter {
         size_t name_len = 0, value_len = 0;
         size_t name_off = 0, value_off = 0;
         LineKind kind = LineKind::Blank;
-
     };
+
 
     class INI {
     public:
