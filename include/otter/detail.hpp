@@ -7,6 +7,39 @@
 
 namespace otter {
 
+
+    namespace Hash {
+        // FNV-1a step over one case-folded character.
+        [[nodiscard]] inline constexpr xhash_t Step(xhash_t h, char c) noexcept {
+            return (h ^ static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)))) * kPrime;
+        }
+
+        // abseil splits the hash into H1 (the upper 57 bits, picks the group)
+        // and H2 (the lower 7 bits, stored in the control byte). Both halves
+        // must be well mixed, and FNV-1a alone is not, so scramble once at the
+        // end (murmur3 finalizer).
+        [[nodiscard]] inline constexpr xhash_t Finalize(xhash_t h) noexcept {
+            h ^= h >> 33; h *= 0xff51afd7ed558ccdULL;
+            h ^= h >> 33; h *= 0xc4ceb9fe1a85ec53ULL;
+            h ^= h >> 33;
+            return h;
+        }
+
+        // input is: kind tag, folded section, then (keys only) '\0' separator and folded key.
+        // The tag keeps a section named "x" apart from a key lookup, the '\0' keeps
+        // ("ab","c") apart from ("a","bc").
+        [[nodiscard]] inline constexpr xhash_t Entry(LineKind kind, std::string_view section,
+            std::string_view key = {}) noexcept {
+            xhash_t h = (kOffset ^ static_cast<xhash_t>(kind)) * kPrime;
+            for (char c : section) h = Step(h, c);
+            if (kind != LineKind::Section) {
+                h = (h ^ 0u) * kPrime; // the '\0' separator
+                for (char c : key) h = Step(h, c);
+            }
+            return Finalize(h);
+        }
+    }
+
     // otter::detail: the Abseil glue (Source, Slot, Query, SlotHash, SlotEq, LineTable) internal to the parser
     namespace detail {
 
@@ -38,6 +71,12 @@ namespace otter {
             LineKind kind;
             std::string_view section, key; // key is empty for sections
         };
+
+        // make a query (constructor)
+        static Query make_query(const Source& src, LineKind kind,
+            std::string_view section, std::string_view key) {
+            return Query{ src, Hash::Entry(kind, section, key), kind, section, key };
+        }
 
         // Hook 1: Abseil calls this to place an element. For a stored Slot we just
         // return the hash we saved (also what Abseil calls on every rehash, so

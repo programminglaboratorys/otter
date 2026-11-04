@@ -4,7 +4,7 @@
 namespace otter {
     namespace Utils {
 
-        [[nodiscard]] inline char LowercaseCharacter(char c) {
+        [[nodiscard]] constexpr inline char LowercaseCharacter(char c) {
             return c >= 'A' && c <= 'Z' ? (c | 0x20) : c;
         }
         [[nodiscard]] inline bool InplaceLowercaseComparison(std::string_view x, std::string_view y) {
