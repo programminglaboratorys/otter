@@ -133,13 +133,13 @@ namespace otter {
             }
         }
 
-        std::string_view get(std::string_view section, std::string_view key, std::string_view default = "") {
+        std::string_view get(std::string_view section, std::string_view key, std::string_view defaultValue = "") {
             // hash
             // TODO: finish it
             auto [section_hash, hash] = Hash::GetLowercaseEx(section, key);
             auto it = key_line_indices.find(hash);
             if (it == key_line_indices.end())
-                return default;
+                return defaultValue;
             auto index = it->second;
             // TODO: handle and check the kind to ensure its the exact key
             const auto& line = lines[index];
