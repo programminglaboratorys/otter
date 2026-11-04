@@ -33,8 +33,8 @@ namespace otter {
         std::vector<Line> lines; // fast metadata data
 
         void parse_lines(const std::string& test_content) {
-            const char* character = test_content.c_str();
             content = test_content; // TODO: move to a constructor or some loader
+            const char* character = content.c_str();
             std::string_view current_section = "";
 
             while (*character != '\0') {
@@ -106,7 +106,7 @@ namespace otter {
                         }
                         const char* value_end = character;
 
-                        line.value_off = value_start - test_content.c_str();
+                        line.value_off = value_start - content.c_str();
                         line.value_len = value_end - value_start;
 
                         std::string_view value(value_start, value_end - value_start);
@@ -119,7 +119,7 @@ namespace otter {
                     }
                     else {
                         line.kind = LineKind::Bare;
-                        line.name_off = key_start - test_content.c_str();
+                        line.name_off = key_start - content.c_str();
                         line.name_len = key_end - key_start;
 
                         while (*character != '\n' && *character != '\r' && *character != '\0') {
@@ -164,9 +164,6 @@ namespace otter {
             //size_t index;
 
         }
-
-
-
 
     private:
         std::string_view inline GetName(const Line& line) {
