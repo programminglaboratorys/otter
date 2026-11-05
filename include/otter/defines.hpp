@@ -1,8 +1,14 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+#include <tuple>
+
+#include "utils.hpp"
 namespace otter {
 
     enum LineKind {
-        Blank, // never used
+        Blank, // tombstone: a deleted line. dropped from `lines` on the next rebuild of the hash table btw
         Section = 1,
         KeyValue = 2,
         Bare = 3,

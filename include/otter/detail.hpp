@@ -1,9 +1,13 @@
 #pragma once
-#include <algorithm>
 #include <cassert>
+#include <cstdint>
+#include <string_view>
+#include <vector>
+
 #include <absl/container/flat_hash_set.h>
 
 #include "defines.hpp"
+#include "utils.hpp"
 
 namespace otter {
 
@@ -43,7 +47,8 @@ namespace otter {
     // otter::detail: the Abseil glue (Source, Slot, Query, SlotHash, SlotEq, LineTable) internal to the parser
     namespace detail {
 
-        // a snapshot of "where the text lives right now" in Query so the table's Eq functor stays stateless
+        // a snapshot of "where the text lives right now" in Query so the table's Eq functor stays stateless.
+        // build it AFTER any change to the text: appending to the content string can move its buffer.
         struct Source {
             const char* base;
             const std::vector<Line>* lines;
@@ -61,10 +66,10 @@ namespace otter {
         struct Slot {
             xhash_t hash = 0;
             mutable uint32_t line = kNone;
-            mutable uint32_t section_line = kNone;
+            mutable uint32_t section_line = kNone; // keys: their section header. sections: their own line.
         };
 
-        // what a lookup/insert asks for
+        // what a lookup/insert asks for. never stored.
         struct Query {
             Source src;
             xhash_t hash;
@@ -73,7 +78,7 @@ namespace otter {
         };
 
         // make a query (constructor)
-        static Query make_query(const Source& src, LineKind kind,
+        inline Query make_query(const Source& src, LineKind kind,
             std::string_view section, std::string_view key) {
             return Query{ src, Hash::Entry(kind, section, key), kind, section, key };
         }
@@ -103,14 +108,16 @@ namespace otter {
                 if constexpr (caseInsensitive) {
                     return Utils::InplaceLowercaseComparison(x, y);
                 }
-                return Utils::InplaceComparison(x, y);
+                else {
+                    return Utils::InplaceComparison(x, y);
+                }
             }
 
             bool operator()(const Slot& s, const Query& q) const {
                 const std::vector<Line>& lines = *q.src.lines;
                 assert(s.line < lines.size());
                 const Line& ln = lines[s.line];
-                if (ln.kind != q.kind) return false; // also rejects tombstones (Blank) bleh
+                if (ln.kind != q.kind) return false; // also rejects tombstones (Blank)
 
                 if (q.kind == LineKind::Section)
                     return inPlaceComparison(q.src.name(ln), q.section);
@@ -132,6 +139,8 @@ namespace otter {
             }
         };
 
+        // the table is decoupled from INI: it never owns or points into the INI.
+        // everything it needs to read the text comes in through a Source.
         class LineTable {
         public:
             using Set = absl::flat_hash_set<Slot, SlotHash, SlotEq<true>>;
@@ -140,6 +149,7 @@ namespace otter {
             size_t capacity() const { return set_.capacity(); }
             const Set& slots() const { return set_; }
 
+            // clear and reserve room for `entries` entries (Abseil picks the real capacity)
             void reset(size_t entries) {
                 set_.clear();
                 set_.reserve(entries);
@@ -180,10 +190,38 @@ namespace otter {
             // Debug helper: is exactly this slot (hash + both indices) in the table?
             bool contains(const Slot& want) const { return set_.find(want) != set_.end(); }
 
+            // deleted lines are tombstones (kind Blank) until the next rebuild, so the table
+            // may be stale on purpose. whoever owns the lines marks it and rebuilds before a lookup.
+            bool dirty() const { return dirty_; }
+            void mark_dirty() { dirty_ = true; }
 
-            // the single place that decides what goes in the table. needed by rebuild()
-            // and also used by the debug check to verify
-            void fill(Source& source, LineTable& t) const {
+            // throw everything away and re-derive the table from the lines in `source`.
+            // compacting the lines (dropping the tombstones) is the owner's job: it owns the vector.
+            void rebuild(const Source& source) {
+                reset(source.lines->size());
+                fill(source, *this);
+                dirty_ = false;
+            }
+
+            // debug only: the patched live table must equal a from-scratch rebuild.
+            // skipped while dirty, because a pending delete makes the live table stale on purpose.
+            void debug_check(const Source& source) const {
+#ifndef NDEBUG
+                if (dirty_) return;
+                LineTable scratch;
+                scratch.reset(source.lines->size());
+                fill(source, scratch);
+                assert(scratch.size() == size());
+                for (const Slot& s : scratch.slots()) assert(contains(s));
+#else
+                (void)source;
+#endif
+            }
+
+        private:
+            // the single place that decides what goes in the table. used by rebuild() and by
+            // the debug check, so they cannot disagree. bare lines are deliberately NOT indexed.
+            static void fill(const Source& source, LineTable& t) {
                 const std::vector<Line>& lines = *source.lines;
                 uint32_t section_line = kNone;
                 for (uint32_t i = 0; i < lines.size(); ++i) {
@@ -199,18 +237,8 @@ namespace otter {
                 }
             }
 
-            void rebuild(Source& source) {
-                const std::vector<Line>& lines = *source.lines;
-                lines.erase(std::remove_if(lines.begin(), lines.end(),
-                    [](const Line& l) { return l.kind == LineKind::Blank; }),
-                    lines.end());
-                set_.reset(lines.size());
-                fill();
-                //dirty_ = false;
-            }
-
-        private:
             Set set_;
+            bool dirty_ = false;
         };
 
     } // namespace detail
