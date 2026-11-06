@@ -44,7 +44,7 @@ namespace otter {
         // the hash is computed here, once per lookup
         inline Query make_query(const Source& src, LineKind kind,
             std::string_view section, std::string_view key) {
-            return Query{ src, Hash::Entry(kind, section, key), kind, section, key };
+            return Query{ src, hash::entry(kind, section, key), kind, section, key };
         }
 
         // hook 1: a stored slot returns its saved hash (so growing never touches the text), a query carries its own
@@ -63,12 +63,12 @@ namespace otter {
 
             bool operator()(const Query& q, const Slot& s) const { return (*this)(s, q); }
 
-            static inline bool inPlaceComparison(std::string_view x, std::string_view y) {
+            static inline bool in_place_comparison(std::string_view x, std::string_view y) {
                 if constexpr (caseInsensitive) {
-                    return Utils::InplaceLowercaseComparison(x, y);
+                    return utils::inplace_lowercase_comparison(x, y);
                 }
                 else {
-                    return Utils::InplaceComparison(x, y);
+                    return utils::inplace_comparison(x, y);
                 }
             }
 
@@ -79,15 +79,15 @@ namespace otter {
                 if (ln.kind != q.kind) return false; // also rejects tombstones (Blank)
 
                 if (q.kind == LineKind::Section)
-                    return inPlaceComparison(q.src.name(ln), q.section);
+                    return in_place_comparison(q.src.name(ln), q.section);
 
-                if (!inPlaceComparison(q.src.name(ln), q.key)) return false;
+                if (!in_place_comparison(q.src.name(ln), q.key)) return false;
 
                 if (s.section_line == kNone) return q.section.empty(); // key before any section
                 assert(s.section_line < lines.size());
                 const Line& header = lines[s.section_line];
                 if (header.kind != LineKind::Section) return false;
-                return inPlaceComparison(q.src.name(header), q.section);
+                return in_place_comparison(q.src.name(header), q.section);
             }
 
             // slot vs slot: used by the debug check, and keeps abseil's own key_type paths well-formed

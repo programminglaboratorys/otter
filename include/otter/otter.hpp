@@ -111,10 +111,10 @@ namespace otter {
         }
 
         // NOTE: the returned view points into `content`; insert_key_value() may move that buffer.
-        std::string_view get(std::string_view section, std::string_view key, std::string_view defaultValue = "") {
+        std::string_view get(std::string_view section, std::string_view key, std::string_view default_value = "") {
             if (table_.dirty()) rebuild(); // a delete left tombstones behind
             const uint32_t index = table_.find(detail::make_query(source(), LineKind::KeyValue, section, key));
-            if (index == kNone) return defaultValue;
+            if (index == kNone) return default_value;
             return value_of(lines[index]);
         }
 
