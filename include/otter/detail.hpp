@@ -12,43 +12,11 @@
 namespace otter {
 
 
-    namespace Hash {
-        // FNV-1a step over one case-folded character.
-        [[nodiscard]] inline constexpr xhash_t Step(xhash_t h, char c) noexcept {
-            return (h ^ static_cast<xhash_t>(static_cast<unsigned char>(Utils::LowercaseCharacter(c)))) * kPrime;
-        }
-
-        // abseil splits the hash into H1 (the upper 57 bits, picks the group)
-        // and H2 (the lower 7 bits, stored in the control byte). Both halves
-        // must be well mixed, and FNV-1a alone is not, so scramble once at the
-        // end (murmur3 finalizer).
-        [[nodiscard]] inline constexpr xhash_t Finalize(xhash_t h) noexcept {
-            h ^= h >> 33; h *= 0xff51afd7ed558ccdULL;
-            h ^= h >> 33; h *= 0xc4ceb9fe1a85ec53ULL;
-            h ^= h >> 33;
-            return h;
-        }
-
-        // input is: kind tag, folded section, then (keys only) '\0' separator and folded key.
-        // The tag keeps a section named "x" apart from a key lookup, the '\0' keeps
-        // ("ab","c") apart from ("a","bc").
-        [[nodiscard]] inline constexpr xhash_t Entry(LineKind kind, std::string_view section,
-            std::string_view key = {}) noexcept {
-            xhash_t h = (kOffset ^ static_cast<xhash_t>(kind)) * kPrime;
-            for (char c : section) h = Step(h, c);
-            if (kind != LineKind::Section) {
-                h = (h ^ 0u) * kPrime; // the '\0' separator
-                for (char c : key) h = Step(h, c);
-            }
-            return Finalize(h);
-        }
-    }
-
-    // otter::detail: the Abseil glue (Source, Slot, Query, SlotHash, SlotEq, LineTable) internal to the parser
+    // the abseil glue: Source, Slot, Query, the hash/eq hooks and LineTable
     namespace detail {
 
-        // a snapshot of "where the text lives right now" in Query so the table's Eq functor stays stateless.
-        // build it AFTER any change to the text: appending to the content string can move its buffer.
+        // where the text lives right now. travels inside every Query so the eq functor stays stateless.
+        // build it after any change to the text: appending to `content` can move the buffer.
         struct Source {
             const char* base;
             const std::vector<Line>* lines;
@@ -56,15 +24,11 @@ namespace otter {
         };
 
 
-        // The stored element. This IS the slot of the Swiss table: Abseil keeps the
-        // 1-byte control array separately, and this 16-byte struct in the slot array.
-        //
-        // `line` / `section_line` are `mutable` on purpose: Abseil hands out const
-        // elements because changing a KEY would corrupt the table. These two fields
-        // are not part of the hash (the stored `hash` is), so the "+1 patch" and the
-        // first-wins takeover may rewrite them in place.
+        // the stored element, 16 bytes (abseil keeps the 1-byte control array separately).
+        // `line` and `section_line` are mutable on purpose: they are not part of the key (`hash` is),
+        // so the +1 patch and the first-wins takeover can rewrite them in place.
         struct Slot {
-            xhash_t hash = 0;
+            name_hash_t hash = 0;
             mutable uint32_t line = kNone;
             mutable uint32_t section_line = kNone; // keys: their section header. sections: their own line.
         };
@@ -72,32 +36,27 @@ namespace otter {
         // what a lookup/insert asks for. never stored.
         struct Query {
             Source src;
-            xhash_t hash;
+            name_hash_t hash;
             LineKind kind;
             std::string_view section, key; // key is empty for sections
         };
 
-        // make a query (constructor)
+        // the hash is computed here, once per lookup
         inline Query make_query(const Source& src, LineKind kind,
             std::string_view section, std::string_view key) {
             return Query{ src, Hash::Entry(kind, section, key), kind, section, key };
         }
 
-        // Hook 1: Abseil calls this to place an element. For a stored Slot we just
-        // return the hash we saved (also what Abseil calls on every rehash, so
-        // growing never touches the text). For a Query the hash is precomputed.
+        // hook 1: a stored slot returns its saved hash (so growing never touches the text), a query carries its own
         struct SlotHash {
             using is_transparent = void;
             size_t operator()(const Slot& s) const { return static_cast<size_t>(s.hash); }
             size_t operator()(const Query& q) const { return static_cast<size_t>(q.hash); }
         };
 
-        // Hook 2: Abseil calls this ONLY after a hash/control-byte match (the 7-bit
-        // H2 filter already rejected ~99% of non-matches). Returning false is never
-        // an error, Abseil just keeps probing. Abseil calls it as (element, key),
-        // so both argument orders are provided and mean the same thing.
-        // Verify order: the line's kind, then the key text, then the section header's
-        // text via section_line, all with the same case fold as the hash.
+        // hook 2: abseil calls this only after a hash/control byte match, and false just means keep probing.
+        // verify order: line kind, key text, then the section header's text (via section_line), all folded like the hash.
+        // both argument orders exist because abseil calls it as (element, key).
         template <bool caseInsensitive>
         struct SlotEq {
             using is_transparent = void;
@@ -131,9 +90,7 @@ namespace otter {
                 return inPlaceComparison(q.src.name(header), q.section);
             }
 
-            // Slot vs Slot: exact structural equality. Used by the debug check
-            // ("is this exact slot in the live table?") and keeps Abseil's own
-            // key_type paths well-formed.
+            // slot vs slot: used by the debug check, and keeps abseil's own key_type paths well-formed
             bool operator()(const Slot& a, const Slot& b) const {
                 return a.hash == b.hash && a.line == b.line && a.section_line == b.section_line;
             }
@@ -161,11 +118,8 @@ namespace otter {
                 return it == set_.end() ? kNone : it->line;
             }
 
-            // first wins, in ONE probe: lazy_emplace looks the Query up and only
-            // builds the Slot if nothing verified. A verified match is a duplicate.
-            // Exception: if the existing winner sits AFTER the new line (we are
-            // inserting in the middle), the new line is earlier in the file, so it
-            // takes over the slot.
+            // first wins in one probe: lazy_emplace only builds the slot if nothing verified, a verified match is a duplicate.
+            // except when the existing winner is after the new line (insert in the middle): the new line is earlier, so it takes over.
             void insert(const Query& q, uint32_t line, uint32_t section_line) {
                 bool inserted = false;
                 auto it = set_.lazy_emplace(q, [&](const auto& construct) {
@@ -178,8 +132,8 @@ namespace otter {
                 }
             }
 
-            // The "+1 patch": a line is about to be inserted at `index`, so every
-            // reference at or after it moves down by one. One pass, no hashing.
+            // the +1 patch: a line is about to land at `index`, so every reference at or after it moves down by one.
+            // one pass over the slots, no hashing
             void shift_from(uint32_t index) {
                 for (const Slot& s : set_) {
                     if (s.line >= index) ++s.line;
@@ -187,7 +141,7 @@ namespace otter {
                 }
             }
 
-            // Debug helper: is exactly this slot (hash + both indices) in the table?
+            // debug helper: is exactly this slot in the table?
             bool contains(const Slot& want) const { return set_.find(want) != set_.end(); }
 
             // deleted lines are tombstones (kind Blank) until the next rebuild, so the table
@@ -218,7 +172,6 @@ namespace otter {
 #endif
             }
 
-        private:
             // the single place that decides what goes in the table. used by rebuild() and by
             // the debug check, so they cannot disagree. bare lines are deliberately NOT indexed.
             static void fill(const Source& source, LineTable& t) {

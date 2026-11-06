@@ -28,7 +28,6 @@ int main()
 
     std::cout << test_content;
 
-    const char* character = test_content.c_str();
     INI ini{};
     ini.parse_lines(test_content);
 
@@ -61,12 +60,11 @@ int main()
         }
     }
     std::cout << "--------------" << std::endl;
-    // print the ini map
-    for (const auto& section : ini.ini) {
-        std::cout << "[" << section.first << "]\n";
-        for (const auto& kv : section.second) {
-            std::cout << "  " << kv.first << " = " << kv.second << "\n";
-        }
-    }
+    // lookups ignore case, and a missing key gives the default you pass
+    std::cout << "ini.get(\"audio\", \"VOLUME\"): " << ini.get("audio", "VOLUME") << std::endl;
+    std::cout << "ini.get(\"Audio\", \"mute\", \"(not a key)\"): " << ini.get("Audio", "mute", "(not a key)") << std::endl;
+    std::cout << std::boolalpha;
+    std::cout << "ini.has_section(\"Hello\"): " << ini.has_section("Hello") << std::endl;
+    std::cout << "ini.has_section(\"Nope\"): " << ini.has_section("Nope") << std::endl;
     return 0;
 }

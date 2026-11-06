@@ -1,7 +1,6 @@
 #pragma once
 #include <algorithm>
 #include <vector>
-#include <unordered_map>
 #include <string>
 #include <string_view>
 #include <iomanip>
@@ -19,14 +18,6 @@ namespace otter {
 
     class INI {
     public:
-        // clean container alias
-        template <typename K, typename V>
-        using Map = std::unordered_map<K, V>;
-
-
-        Map<std::string, Map<std::string, std::string>> ini{}; // TODO: should we remove?
-
-
         std::string content = "";
 
         std::vector<Line> lines; // fast metadata data. the source of truth, the table is derived from it.
@@ -34,9 +25,7 @@ namespace otter {
         void parse_lines(const std::string& test_content) {
             content = test_content; // TODO: move to a constructor or some loader
             lines.clear();
-            ini.clear();
             const char* character = content.c_str();
-            std::string_view current_section = "";
 
             while (*character != '\0') {
                 if (*character == ' ' || *character == '\t' || *character == '\r' || *character == '\n') {
@@ -60,8 +49,6 @@ namespace otter {
                     }
                     line.name_off = section_start - content.c_str();
                     line.name_len = section_end - section_start;
-
-                    current_section = std::string_view(section_start, section_end - section_start);
 
                     lines.push_back(line);
                     while (*character != '\n' && *character != '\r' && *character != '\0') {
@@ -88,8 +75,6 @@ namespace otter {
                     while (key_end > key_start && (*(key_end - 1) == ' ' || *(key_end - 1) == '\t')) {
                         key_end--;
                     }
-                    std::string_view key(key_start, key_end - key_start);
-
                     if (*character == '=') {
                         line.kind = LineKind::KeyValue;
                         line.name_off = key_start - content.c_str();
@@ -107,11 +92,6 @@ namespace otter {
 
                         line.value_off = value_start - content.c_str();
                         line.value_len = value_end - value_start;
-
-                        std::string_view value(value_start, value_end - value_start);
-                        if (!current_section.empty() && !key.empty()) {
-                            ini[std::string(current_section)][std::string(key)] = std::string(value);
-                        }
                         lines.push_back(line);
                     }
                     else {
@@ -135,7 +115,7 @@ namespace otter {
             if (table_.dirty()) rebuild(); // a delete left tombstones behind
             const uint32_t index = table_.find(detail::make_query(source(), LineKind::KeyValue, section, key));
             if (index == kNone) return defaultValue;
-            return GetValue(lines[index]);
+            return value_of(lines[index]);
         }
 
         bool has_section(std::string_view name) {
@@ -196,7 +176,7 @@ namespace otter {
             table_.rebuild(source());
         }
 
-    private:
+
         using Source = detail::Source;
         using Query = detail::Query;
         using Slot = detail::Slot;
@@ -204,12 +184,12 @@ namespace otter {
 
         Source source() const { return Source{ content.c_str(), &lines }; }
 
-        std::string_view inline GetName(const Line& line) {
+        std::string_view inline name_of(const Line& line) {
             const char* key_start = content.c_str() + line.name_off;
             return { key_start, line.name_len };
         }
 
-        std::string_view inline GetValue(const Line& line) {
+        std::string_view inline value_of(const Line& line) {
             const char* value_start = content.c_str() + line.value_off;
             return { value_start, line.value_len };
         }
