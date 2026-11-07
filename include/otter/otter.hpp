@@ -23,7 +23,7 @@ namespace otter {
         std::vector<Line> lines; // fast metadata data. the source of truth, the table is derived from it.
 
         void parse_lines(const std::string& test_content) {
-            content = test_content; // TODO: move to a constructor or some loader
+            content = test_content; // TODO: move to a constructor or some loader method
             lines.clear();
             const char* character = content.c_str();
 
